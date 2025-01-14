@@ -19,7 +19,7 @@ library(gridExtra)
   
   #current_day <- yday(Sys.Date())
   current_day <- 200   # Hard code this for now as current date doesn't work well, needs thought
-  current_year  <- year(Sys.Date())
+  current_year  <- 2024 #year(Sys.Date())
   
   # Set the years for the app to cover, including current year
   yr_rng <- 2016:current_year
@@ -66,8 +66,8 @@ ui <- navbarPage(
                                       width = "400px", ticks = TRUE, sep = "", step = 10),
                           br(),
                           checkboxInput("add_forest", "Add 2nd model", value = FALSE),
-                          checkboxInput("add_TAC", "Add TAC to plot", value = FALSE),
-                          numericInput("tac", "Total allowable catch (mt):", 1200, min = 0, max = 2000, step = 100, width = "200px")
+                          checkboxInput("add_TAC", "Add TAC to plot", value = TRUE),
+                          numericInput("tac", "Total allowable catch (mt):", 1600, min = 0, max = 2000, step = 100, width = "200px")
              ),
              mainPanel(
                br(),
@@ -131,14 +131,16 @@ server <- function(input, output) {
     
     pl <- pl + geom_bar(data = dat_pl$pl_predict_glm, aes(x = set_day, y = Cum_alb/1000, fill = Type), stat = "identity", width = 1) +
                 geom_vline(xintercept = focal_day, colour = alpha("dodgerblue", .5)) +
-                geom_hline(yintercept = dat_pl$pl_current$Cum_alb/1000, colour = alpha("dodgerblue", .5), linetype = 2) +
+                geom_hline(yintercept = dat_pl$pl_current$Cum_alb/1000, colour = alpha("dodgerblue", .8), linetype = 2) +
                 geom_ribbon(data = dat_pl$boot_all_sht, aes(x = set_day, ymin = cum_LL95/1000, ymax = cum_UL95/1000), fill = alpha("red", .15), colour = "grey30") + #, linetype = 2) +
                 geom_line(data = dat_pl$pl_tot_glm, aes(x = set_day, y = Cum_alb/1000), linewidth = 1.2, colour = alpha("red", .9)) +
                 geom_point(data = dat_pl$pl_current, aes(x = set_day, y = Cum_alb/1000), colour = alpha("red", .99), size = 5) +
+                geom_hline(yintercept = last(dat_pl$dat_all_future$Cum_alb/1000), colour = alpha("green2", .85), linetype = 2) +
                 geom_line(data = dat_pl$dat_all_future, aes(x = Day, y = Cum_alb/1000), linewidth = .9, colour = alpha("deeppink", .3)) +
                 geom_ribbon(data = dat_pl$dat_all_future, aes(x = Day, ymin = cum_LL95/1000, ymax = cum_UL95/1000), fill = alpha("yellow", .15)) + #, linetype = 2) +
                 geom_point(data = dat_pl$pl_current, aes(x = set_day, y = Cum_alb/1000), colour = alpha("red", .99), size = 5) +
                 annotate("text", x = 0, y = 1.05*dat_pl$pl_current$Cum_alb/1000, label = paste(round(dat_pl$pl_current$Cum_alb/1000), "mt"), colour = "dodgerblue", fontface = 2, size = 5) +
+                annotate("text", x = 0, y = 1.05*last(dat_pl$dat_all_future$Cum_alb/1000), label = paste(round(last(dat_pl$dat_all_future$Cum_alb/1000)), "mt"), colour = "green2", fontface = 2, size = 5) +
                 annotate("text", x = 40, y = .88*max_y, label = paste(day(dat_pl$boot_all$day_date[focal_day]), month.abb[month(dat_pl$boot_all$day_date[focal_day])], focal_yr), size = 7, colour = "grey30", fontface = 2) +
                 annotate("text", x = 40, y = .95*max_y, label = paste("Day", focal_day), size = 7, colour = "grey30") +
                 xlab("") + ylab("Cumulative catch of albacore (mt)") +   # xlab("Day of year")
