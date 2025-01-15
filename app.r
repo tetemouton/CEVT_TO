@@ -148,7 +148,7 @@ server <- function(input, output) {
                 scale_x_continuous(breaks = seq(1, 365, 40),
                                    labels = paste(day(dat_pl$boot_all$day_date[seq(1, 365, 40)]), month.abb[month(dat_pl$boot_all$day_date[seq(1, 365, 40)])])) +
                 scale_y_continuous(limits = c(NA, max_y), breaks = seq(0, max_y, 250)) +
-                theme(axis.title = element_text(size = 16), axis.text.x = element_text(size = 14, angle = 45, vjust = 0.5, hjust = .5),
+                theme(axis.title = element_text(size = 16), axis.text.x = element_text(size = 14, angle = 45, vjust = .5, hjust = .5),
                       axis.text.y = element_text(size = 14), legend.position = "top", legend.text = element_text(size = 13),
                       legend.background = element_blank(), legend.title = element_blank())
     
@@ -169,12 +169,22 @@ server <- function(input, output) {
                 #coord_flip() + xlab("Vessel") + ylab("Cumulative catch of albacore (mt)") + theme_clean() +
                 xlab("") + ylab("Cumulative catch of albacore (mt)") + theme_minimal() +
                 theme(axis.title = element_text(size = 16), axis.text.y = element_text(size = 14),
-                      axis.text.x = element_text(size = 14, angle = 45, vjust = 0.5, hjust = .5),
+                      axis.text.x = element_text(size = 14, angle = 45, vjust = .5, hjust = .5),
                       legend.position = "none",
                       legend.background = element_blank(), legend.title = element_blank())
     pl
 
   }, height = 400, width = 800)
+  
+  
+  # windows(1500,3000)
+  # ggplot(ves_tile_data, aes(x = vesselname, y = set_day, fill = Type)) + geom_tile() +
+  #   scale_x_discrete(position = "top") + scale_y_reverse(limits = c(366,0)) +
+  #   ylab("Day of year") +
+  #   theme(axis.text = element_text(angle = 90, vjust = 1, hjust = 0),
+  #         axis.title.x = element_blank(),
+  #         legend.position = "bottom", legend.title = element_blank())
+  
   
   
 }
