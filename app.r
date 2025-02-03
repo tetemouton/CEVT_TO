@@ -52,14 +52,6 @@ ui <- navbarPage(
            
            sidebarLayout(
              sidebarPanel(width = 2,
-                          # selectInput("year", "Select the year of fishing:",
-                          #             c("Current year" = "yr_cur", "Historical" = "yr_hist")),
-                          # br(),
-                          # conditionalPanel(
-                          #   "input.year == 'yr_hist'",
-                          #   sliderInput("slideryr", "Year slider", min = yr_rng[1], max = yr_rng[length(yr_rng) - 1], value = yr_rng[length(yr_rng) - 1],
-                          #               width = "400px", ticks = TRUE, sep = "", step = 1)
-                          # ),
                           sliderInput("slideryr", "Choose year",  min = min(yr_rng), max = max(yr_rng), value = max(yr_rng),
                                       width = "400px", ticks = TRUE, sep = "", step = 1),
                           sliderInput("sliderday", "Choose day of year",  min = 10, max = 360, value = current_day,
