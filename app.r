@@ -22,7 +22,6 @@ library(gridExtra)
   #summary_pth <- "C:/Albacore_Catch_Modelling/Full_process/"
   
   #current_day <- yday(Sys.Date())
-  current_day <- 200   # Hard code this for now as current date doesn't work well, needs thought
   current_year  <- 2025 #year(Sys.Date())
   
   # Set the years for the app to cover, including current year
@@ -31,6 +30,12 @@ library(gridExtra)
   load("./Output/CEVT_Results_Saved.RData", verbose = TRUE)
   
   ctrl_hist <- read.csv(file = "./Output/CEVT_control_file.csv", header = TRUE)
+  
+  # Define steps for day slider bar
+  uni_day <- unique(ctrl_hist$y)
+  day_step <- uni_day[2] - uni_day[1]
+  
+  current_day <- min(uni_day)   # Hard code this for now as current date doesn't work well, needs thought
   
   #ctrl_Latest <- read.csv(file = paste0(summary_pth, "Output/TO/CEVT_control_file_Latest.csv"), header = TRUE)
   
@@ -94,8 +99,8 @@ ui <- navbarPage(
              sidebarPanel(width = 2,
                           sliderInput("slideryr", "Choose year",  min = min(yr_rng), max = max(yr_rng) - 1, value = max(yr_rng) - 1,
                                       width = "400px", ticks = TRUE, sep = "", step = 1),
-                          sliderInput("sliderday", "Choose day of year",  min = 10, max = 360, value = current_day,
-                                      width = "400px", ticks = TRUE, sep = "", step = 10),
+                          sliderInput("sliderday", "Choose day of year",  min = min(uni_day), max = max(uni_day), value = current_day,
+                                      width = "400px", ticks = TRUE, sep = "", step = day_step),
                           br(),
                           checkboxInput("add_forest", "Add 2nd model", value = FALSE),
                           checkboxInput("add_TAC", "Add TAC to plot", value = TRUE),
@@ -130,15 +135,15 @@ server <- function(input, output) {
   
   
   sum_dat <- reactive({
-
-      fcl_yr <- input$slideryr
-      
-      fcl_day <- input$sliderday
-      
-      cnt_index <- which(ctrl_hist$x == fcl_yr & ctrl_hist$y == fcl_day)
-      
-      dat <- CEVT_output[[cnt_index]]
-
+    
+    fcl_yr <- input$slideryr
+    
+    fcl_day <- input$sliderday
+    
+    cnt_index <- which(ctrl_hist$x == fcl_yr & ctrl_hist$y == fcl_day)
+    
+    dat <- CEVT_output[[cnt_index]]
+    
   })
   
   
@@ -150,9 +155,9 @@ server <- function(input, output) {
     
     focal_day <- input$sliderday
     
-    max_y <- 1.35*max(dat_pl$pl_ref$Cum_alb/1000) #max(1.35*max(pl_ref$Cum_alb/1000), dat_all_future$Cum_alb/1000*1.1)
+    max_y <- max(1.35*max(dat_pl$boot_all_sht$cum_UL95/1000), 1.35*max(dat_pl$dat_all_future$Cum_alb/1000), 1.35*max(dat_pl$pl_ref$Cum_alb/1000))
     
-    if(input$add_TAC) max_y <- max(1.35*max(dat_pl$pl_ref$Cum_alb/1000), input$tac)
+    if(input$add_TAC) max_y <- max(1.35*max(dat_pl$boot_all_sht$cum_UL95/1000), 1.35*max(dat_pl$dat_all_future$Cum_alb/1000), 1.35*max(dat_pl$pl_ref$Cum_alb/1000), input$tac)
     
     pl <- ggplot()
     
@@ -162,27 +167,28 @@ server <- function(input, output) {
     dat_pl$dat_all_future$cum_UL95 <- ifelse(dat_pl$dat_all_future$cum_UL95 > max_y*1000, max_y*1000, dat_pl$dat_all_future$cum_UL95)
     
     pl <- pl + geom_bar(data = dat_pl$pl_predict_glm, aes(x = set_day, y = Cum_alb/1000, fill = Type), stat = "identity", width = 1) +
-                geom_vline(xintercept = focal_day, colour = alpha("dodgerblue", .5)) +
-                geom_hline(yintercept = dat_pl$pl_current$Cum_alb/1000, colour = alpha("dodgerblue", .8), linetype = 2) +
-                geom_ribbon(data = dat_pl$boot_all_sht, aes(x = set_day, ymin = cum_LL95/1000, ymax = cum_UL95/1000), fill = alpha("red", .15), colour = "grey30") + #, linetype = 2) +
-                geom_line(data = dat_pl$pl_tot_glm, aes(x = set_day, y = Cum_alb/1000), linewidth = 1.2, colour = alpha("red", .9)) +
-                geom_point(data = dat_pl$pl_current, aes(x = set_day, y = Cum_alb/1000), colour = alpha("red", .99), size = 5) +
-                geom_hline(yintercept = last(dat_pl$dat_all_future$Cum_alb/1000), colour = alpha("green2", .85), linetype = 2) +
-                geom_line(data = dat_pl$dat_all_future, aes(x = Day, y = Cum_alb/1000), linewidth = .9, colour = alpha("deeppink", .3)) +
-                geom_ribbon(data = dat_pl$dat_all_future, aes(x = Day, ymin = cum_LL95/1000, ymax = cum_UL95/1000), fill = alpha("yellow", .15)) + #, linetype = 2) +
-                geom_point(data = dat_pl$pl_current, aes(x = set_day, y = Cum_alb/1000), colour = alpha("red", .99), size = 5) +
-                annotate("text", x = 0, y = 1.05*dat_pl$pl_current$Cum_alb/1000, label = paste(round(dat_pl$pl_current$Cum_alb/1000), "mt"), colour = "dodgerblue", fontface = 2, size = 5) +
-                annotate("text", x = 0, y = 1.05*last(dat_pl$dat_all_future$Cum_alb/1000), label = paste(round(last(dat_pl$dat_all_future$Cum_alb/1000)), "mt"), colour = "green2", fontface = 2, size = 5) +
-                annotate("text", x = 40, y = .88*max_y, label = paste(day(dat_pl$boot_all$day_date[focal_day]), month.abb[month(dat_pl$boot_all$day_date[focal_day])], focal_yr), size = 7, colour = "grey30", fontface = 2) +
-                annotate("text", x = 40, y = .95*max_y, label = paste("Day", focal_day), size = 7, colour = "grey30") +
-                xlab("") + ylab("Cumulative catch of albacore (mt)") +   # xlab("Day of year")
-                scale_fill_manual(values = c(alpha("navy", .2), alpha("navy", .7))) + theme_minimal() + # Theme clean looks nicer but has border
-                scale_x_continuous(breaks = seq(1, 365, 40),
-                                   labels = paste(day(dat_pl$boot_all$day_date[seq(1, 365, 40)]), month.abb[month(dat_pl$boot_all$day_date[seq(1, 365, 40)])])) +
-                scale_y_continuous(limits = c(NA, max_y), breaks = seq(0, max_y, 250)) +
-                theme(axis.title = element_text(size = 16), axis.text.x = element_text(size = 14, angle = 45, vjust = .5, hjust = .5),
-                      axis.text.y = element_text(size = 14), legend.position = "top", legend.text = element_text(size = 13),
-                      legend.background = element_blank(), legend.title = element_blank())
+      geom_vline(xintercept = focal_day, colour = alpha("dodgerblue", .5)) +
+      geom_hline(yintercept = dat_pl$pl_current$Cum_alb/1000, colour = alpha("dodgerblue", .8), linetype = 2) +
+      geom_ribbon(data = dat_pl$boot_all_sht, aes(x = set_day, ymin = cum_LL95/1000, ymax = cum_UL95/1000), fill = alpha("red", .15), colour = "grey30") + #, linetype = 2) +
+      geom_line(data = dat_pl$pl_tot_glm, aes(x = set_day, y = Cum_alb/1000), linewidth = 1.2, colour = alpha("red", .9)) +
+      geom_point(data = dat_pl$pl_current, aes(x = set_day, y = Cum_alb/1000), colour = alpha("red", .99), size = 5) +
+      geom_hline(yintercept = last(dat_pl$dat_all_future$Cum_alb/1000), colour = alpha("green2", .85), linetype = 2) +
+      geom_line(data = dat_pl$dat_all_future, aes(x = Day, y = Cum_alb/1000), linewidth = .9, colour = alpha("deeppink", .3)) +
+      geom_line(data = dat_pl$dat_all_future, aes(x = Day, y = Cum_alb_for/1000), linewidth = .9, colour = alpha("grey", .3)) +
+      geom_ribbon(data = dat_pl$dat_all_future, aes(x = Day, ymin = cum_LL95/1000, ymax = cum_UL95/1000), fill = alpha("yellow", .15)) + #, linetype = 2) +
+      geom_point(data = dat_pl$pl_current, aes(x = set_day, y = Cum_alb/1000), colour = alpha("red", .99), size = 5) +
+      annotate("text", x = 0, y = 1.05*dat_pl$pl_current$Cum_alb/1000, label = paste(round(dat_pl$pl_current$Cum_alb/1000), "mt"), colour = "dodgerblue", fontface = 2, size = 5) +
+      annotate("text", x = 0, y = 1.05*last(dat_pl$dat_all_future$Cum_alb/1000), label = paste(round(last(dat_pl$dat_all_future$Cum_alb/1000)), "mt"), colour = "green2", fontface = 2, size = 5) +
+      annotate("text", x = 40, y = .88*max_y, label = paste(day(dat_pl$boot_all$day_date[focal_day]), month.abb[month(dat_pl$boot_all$day_date[focal_day])], focal_yr), size = 7, colour = "grey30", fontface = 2) +
+      annotate("text", x = 40, y = .95*max_y, label = paste("Day", focal_day), size = 7, colour = "grey30") +
+      xlab("") + ylab("Cumulative catch of albacore (mt)") +   # xlab("Day of year")
+      scale_fill_manual(values = c(alpha("navy", .2), alpha("navy", .7))) + theme_minimal() + # Theme clean looks nicer but has border
+      scale_x_continuous(breaks = seq(1, 365, 40),
+                         labels = paste(day(dat_pl$boot_all$day_date[seq(1, 365, 40)]), month.abb[month(dat_pl$boot_all$day_date[seq(1, 365, 40)])])) +
+      scale_y_continuous(limits = c(NA, max_y), breaks = seq(0, max_y, round(max_y/10, -2))) +
+      theme(axis.title = element_text(size = 16), axis.text.x = element_text(size = 14, angle = 45, vjust = .5, hjust = .5),
+            axis.text.y = element_text(size = 14), legend.position = "top", legend.text = element_text(size = 13),
+            legend.background = element_blank(), legend.title = element_blank())
     
     if(input$add_forest) pl <- pl + geom_line(data = dat_pl$pl_tot, aes(x = set_day, y = Cum_alb/1000), linewidth = 1, colour = alpha("green", .7))
     
@@ -192,20 +198,24 @@ server <- function(input, output) {
   
   
   output$Vesbar <- renderPlot({
-
+    
     dat_pl <- sum_dat()
-
+    
+    n_ves <- length(unique(dat_pl$pl_ves$Vessel))
+    
+    x_text_sz <- ifelse(n_ves > 35, 12, 14)
+    
     pl = ggplot() + geom_bar(data = dat_pl$pl_ves, aes(x = Vessel, y = alb_catch_ref/1000, fill = Type), stat = "identity", width = .8) +#, colour = "black") +
-                scale_fill_manual(values = c(alpha("navy", .1), alpha("navy", .5))) +
-                #geom_bar(data = dat_pl$cum_ref_ves, aes(x = Vessel, y = alb_catch_ref/1000), stat = "identity", width = .8, fill = alpha("white",.01), colour = alpha("black", .3)) +
-                #coord_flip() + xlab("Vessel") + ylab("Cumulative catch of albacore (mt)") + theme_clean() +
-                xlab("") + ylab("Cumulative catch of albacore (mt)") + theme_minimal() +
-                theme(axis.title = element_text(size = 16), axis.text.y = element_text(size = 14),
-                      axis.text.x = element_text(size = 14, angle = 45, vjust = .5, hjust = .5),
-                      legend.position = "none",
-                      legend.background = element_blank(), legend.title = element_blank())
+      scale_fill_manual(values = c(alpha("navy", .1), alpha("navy", .5))) +
+      #geom_bar(data = dat_pl$cum_ref_ves, aes(x = Vessel, y = alb_catch_ref/1000), stat = "identity", width = .8, fill = alpha("white",.01), colour = alpha("black", .3)) +
+      #coord_flip() + xlab("Vessel") + ylab("Cumulative catch of albacore (mt)") + theme_clean() +
+      xlab("") + ylab("Cumulative catch of albacore (mt)") + theme_minimal() +
+      theme(axis.title = element_text(size = 16), axis.text.y = element_text(size = 14),
+            axis.text.x = element_text(size = x_text_sz, angle = 90, vjust = .5, hjust = 1),
+            legend.position = "none",
+            legend.background = element_blank(), legend.title = element_blank())
     pl
-
+    
   }, height = 400, width = 800)
   
   
@@ -217,7 +227,7 @@ server <- function(input, output) {
   #         axis.title.x = element_blank(),
   #         legend.position = "bottom", legend.title = element_blank())
   
-#_______________________________________________________________________________
+  #_______________________________________________________________________________
   
   
   
@@ -229,17 +239,18 @@ server <- function(input, output) {
     
     focal_day <- cur_dy
     
-    max_y <- 1.35*max(dat_pl$pl_ref$Cum_alb/1000) #max(1.35*max(pl_ref$Cum_alb/1000), dat_all_future$Cum_alb/1000*1.1)
     
-    if(input$add_TAC) max_y <- max(1.35*max(dat_pl$pl_ref$Cum_alb/1000), input$tac)
-
+    max_y <- max(1.35*max(dat_pl$boot_all_sht$cum_UL95/1000), 1.35*max(dat_pl$dat_all_future$Cum_alb/1000), 1.35*max(dat_pl$pl_ref$Cum_alb/1000))
+    
+    if(input$add_TAC1) max_y <- max(1.35*max(dat_pl$boot_all_sht$cum_UL95/1000), 1.35*max(dat_pl$dat_all_future$Cum_alb/1000), 1.35*max(dat_pl$pl_ref$Cum_alb/1000), input$tac1)
+    
     pl <- ggplot()
-
+    
     #if(input$slideryr != max(yr_rng)) pl <- pl + geom_line(data = dat_pl$pl_ref, aes(x = set_day, y = Cum_alb/1000), linewidth = 1.2)
-    if(input$add_TAC) pl <- pl + geom_hline(yintercept = input$tac, colour = alpha("magenta3", .5), linetype = 2)
-
+    if(input$add_TAC1) pl <- pl + geom_hline(yintercept = input$tac1, colour = alpha("magenta3", .5), linetype = 2)
+    
     dat_pl$dat_all_future$cum_UL95 <- ifelse(dat_pl$dat_all_future$cum_UL95 > max_y*1000, max_y*1000, dat_pl$dat_all_future$cum_UL95)
-
+    
     pl <- pl + geom_bar(data = dat_pl$pl_predict_glm, aes(x = set_day, y = Cum_alb/1000, fill = Type), stat = "identity", width = 1) +
       geom_vline(xintercept = focal_day, colour = alpha("dodgerblue", .5)) +
       geom_hline(yintercept = dat_pl$pl_current$Cum_alb/1000, colour = alpha("dodgerblue", .8), linetype = 2) +
@@ -248,6 +259,7 @@ server <- function(input, output) {
       geom_point(data = dat_pl$pl_current, aes(x = set_day, y = Cum_alb/1000), colour = alpha("red", .99), size = 5) +
       geom_hline(yintercept = last(dat_pl$dat_all_future$Cum_alb/1000), colour = alpha("green2", .85), linetype = 2) +
       geom_line(data = dat_pl$dat_all_future, aes(x = Day, y = Cum_alb/1000), linewidth = .9, colour = alpha("deeppink", .3)) +
+      geom_line(data = dat_pl$dat_all_future, aes(x = Day, y = Cum_alb_for/1000), linewidth = .9, colour = alpha("grey", .3)) +
       geom_ribbon(data = dat_pl$dat_all_future, aes(x = Day, ymin = cum_LL95/1000, ymax = cum_UL95/1000), fill = alpha("yellow", .15)) + #, linetype = 2) +
       geom_point(data = dat_pl$pl_current, aes(x = set_day, y = Cum_alb/1000), colour = alpha("red", .99), size = 5) +
       annotate("text", x = 0, y = 1.05*dat_pl$pl_current$Cum_alb/1000, label = paste(round(dat_pl$pl_current$Cum_alb/1000), "mt"), colour = "dodgerblue", fontface = 2, size = 5) +
@@ -258,13 +270,13 @@ server <- function(input, output) {
       scale_fill_manual(values = c(alpha("navy", .2), alpha("navy", .7))) + theme_minimal() + # Theme clean looks nicer but has border
       scale_x_continuous(breaks = seq(1, 365, 40),
                          labels = paste(day(dat_pl$boot_all$day_date[seq(1, 365, 40)]), month.abb[month(dat_pl$boot_all$day_date[seq(1, 365, 40)])])) +
-      scale_y_continuous(limits = c(NA, max_y), breaks = seq(0, max_y, 250)) +
+      scale_y_continuous(limits = c(NA, max_y), breaks = seq(0, max_y, round(max_y/10, -2))) +
       theme(axis.title = element_text(size = 16), axis.text.x = element_text(size = 14, angle = 45, vjust = .5, hjust = .5),
             axis.text.y = element_text(size = 14), legend.position = "top", legend.text = element_text(size = 13),
             legend.background = element_blank(), legend.title = element_blank())
-
-    if(input$add_forest) pl <- pl + geom_line(data = dat_pl$pl_tot, aes(x = set_day, y = Cum_alb/1000), linewidth = 1, colour = alpha("green", .7))
-
+    
+    if(input$add_forest1) pl <- pl + geom_line(data = dat_pl$pl_tot, aes(x = set_day, y = Cum_alb/1000), linewidth = 1, colour = alpha("green", .7))
+    
     pl
     
   }, height = 500, width = 800)
@@ -274,13 +286,17 @@ server <- function(input, output) {
     
     dat_pl <- CEVT_output_latest[[1]]
     
+    n_ves <- length(unique(dat_pl$pl_ves$Vessel))
+    
+    x_text_sz <- ifelse(n_ves > 35, 12, 14)
+    
     pl = ggplot() + geom_bar(data = dat_pl$pl_ves, aes(x = Vessel, y = alb_catch_ref/1000, fill = Type), stat = "identity", width = .8) +#, colour = "black") +
       scale_fill_manual(values = c(alpha("navy", .1), alpha("navy", .5))) +
       #geom_bar(data = dat_pl$cum_ref_ves, aes(x = Vessel, y = alb_catch_ref/1000), stat = "identity", width = .8, fill = alpha("white",.01), colour = alpha("black", .3)) +
       #coord_flip() + xlab("Vessel") + ylab("Cumulative catch of albacore (mt)") + theme_clean() +
       xlab("") + ylab("Cumulative catch of albacore (mt)") + theme_minimal() +
       theme(axis.title = element_text(size = 16), axis.text.y = element_text(size = 14),
-            axis.text.x = element_text(size = 14, angle = 45, vjust = .5, hjust = .5),
+            axis.text.x = element_text(size = x_text_sz, angle = 90, vjust = .5, hjust = 1),
             legend.position = "none",
             legend.background = element_blank(), legend.title = element_blank())
     pl
